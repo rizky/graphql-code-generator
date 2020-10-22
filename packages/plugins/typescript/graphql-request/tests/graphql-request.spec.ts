@@ -87,6 +87,7 @@ async function test() {
 }`;
       const output = await validate(result, config, docs, schema, usage);
 
+      expect(result.content).toContain(`(print(FeedDocument), variables));`);
       expect(output).toMatchSnapshot();
     });
 
@@ -153,6 +154,51 @@ async function test() {
       const output = await validate(result, config, docs, schema, usage);
 
       expect(output).toMatchSnapshot();
+    });
+
+    it('Should support useTypeImports', async () => {
+      const config = { useTypeImports: true };
+      const docs = [{ location: '', document: basicDoc }];
+      const result = (await plugin(schema, docs, config, {
+        outputFile: 'graphql.ts',
+      })) as Types.ComplexPluginOutput;
+
+      const usage = `
+async function test() {
+  const client = new GraphQLClient('');
+  const sdk = getSdk(client);
+  
+  await sdk.feed();
+  await sdk.feed3();
+  await sdk.feed4();
+
+  const result = await sdk.feed2({ v: "1" });
+
+  if (result.feed) {
+    if (result.feed[0]) {
+      const id = result.feed[0].id
+    }
+  }
+}`;
+      const output = await validate(result, config, docs, schema, usage);
+
+      expect(output).toMatchSnapshot();
+    });
+  });
+
+  describe('issues', () => {
+    it('#4748 - integration with importDocumentNodeExternallyFrom', async () => {
+      const config = { importDocumentNodeExternallyFrom: './operations', documentMode: DocumentMode.external };
+      const docs = [{ location: '', document: basicDoc }];
+      const result = (await plugin(schema, docs, config, {
+        outputFile: 'graphql.ts',
+      })) as Types.ComplexPluginOutput;
+      const output = await validate(result, config, docs, schema, '');
+
+      expect(output).toContain(`import * as Operations from './operations';`);
+      expect(output).toContain(`(print(Operations.FeedDocument), variables));`);
+      expect(output).toContain(`(print(Operations.Feed2Document), variables));`);
+      expect(output).toContain(`(print(Operations.Feed3Document), variables));`);
     });
   });
 });

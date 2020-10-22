@@ -1,3 +1,8 @@
+/* eslint-disable import/first */
+jest.mock('latest-version', () => {
+  return () => Promise.resolve('1.0.0');
+});
+
 import bddStdin from 'bdd-stdin';
 import { resolve } from 'path';
 import { init } from '../src/init';
@@ -113,7 +118,7 @@ describe('init', () => {
     expect(writeFileSpy).toHaveBeenCalledTimes(2);
 
     const pkg = JSON.parse(writeFileSpy.mock.calls[1][1] as string);
-    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string);
+    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string) as Record<string, any>;
 
     // should use default output path
     expect(config.generates['src/generated/graphql.ts']).toBeDefined();
@@ -156,7 +161,7 @@ describe('init', () => {
     expect(writeFileSpy).toHaveBeenCalledTimes(2);
 
     const pkg = JSON.parse(writeFileSpy.mock.calls[1][1] as string);
-    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string);
+    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string) as Record<string, any>;
 
     // should use default output path
     expect(config.generates['src/generated/graphql.tsx']).toBeDefined();
@@ -199,7 +204,7 @@ describe('init', () => {
     expect(writeFileSpy).toHaveBeenCalledTimes(2);
 
     const pkg = JSON.parse(writeFileSpy.mock.calls[1][1] as string);
-    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string);
+    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string) as Record<string, any>;
 
     // should use default output path
     expect(config.generates['src/generated/graphql.tsx']).toBeDefined();
@@ -241,7 +246,7 @@ describe('init', () => {
     expect(writeFileSpy).toHaveBeenCalledTimes(2);
 
     const pkg = JSON.parse(writeFileSpy.mock.calls[1][1] as string);
-    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string);
+    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string) as Record<string, any>;
 
     // should use default output path
     expect(config.generates['src/generated/graphql.ts']).toBeDefined();
@@ -285,7 +290,7 @@ describe('init', () => {
     await init();
 
     const configFile = writeFileSpy.mock.calls[0][0] as string;
-    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string);
+    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string) as Record<string, any>;
     const pkg = JSON.parse(writeFileSpy.mock.calls[1][1] as string);
 
     expect(pkg.scripts.graphql).toEqual(`graphql-codegen --config ${defaults.config}`);
@@ -294,7 +299,7 @@ describe('init', () => {
     expect(config.schema).toEqual(defaults.schema);
     expect(config.documents).toEqual(defaults.documents);
     expect(config.generates[defaults.output]).toBeDefined();
-    expect(logSpy.mock.calls[1][0]).toContain(`Config file generated at ${bold(defaults.config)}`);
+    expect(logSpy.mock.calls[2][0]).toContain(`Config file generated at ${bold(defaults.config)}`);
   });
 
   it('should have few default values', async () => {
@@ -325,7 +330,7 @@ describe('init', () => {
     await init();
 
     const configFile = writeFileSpy.mock.calls[0][0] as string;
-    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string);
+    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string) as Record<string, any>;
     const pkg = JSON.parse(writeFileSpy.mock.calls[1][1] as string);
 
     expect(pkg.scripts[options.script]).toEqual(`graphql-codegen --config ${options.config}`);
@@ -334,7 +339,7 @@ describe('init', () => {
     expect(config.schema).toEqual(options.schema);
     expect(config.documents).toEqual(options.documents);
     expect(config.generates[options.output]).toBeDefined();
-    expect(logSpy.mock.calls[1][0]).toContain(`Config file generated at ${bold(options.config)}`);
+    expect(logSpy.mock.calls[2][0]).toContain(`Config file generated at ${bold(options.config)}`);
   });
 
   it('custom setup', async () => {
@@ -362,7 +367,7 @@ describe('init', () => {
     expect(writeFileSpy).toHaveBeenCalledTimes(2);
 
     const pkg = JSON.parse(writeFileSpy.mock.calls[1][1] as string);
-    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string);
+    const config = safeLoad(writeFileSpy.mock.calls[0][1] as string) as Record<string, any>;
 
     // config
     // should overwrite
@@ -392,7 +397,7 @@ describe('init', () => {
 
     // logs
     const welcomeMsg = logSpy.mock.calls[0][0];
-    const doneMsg = logSpy.mock.calls[1][0];
+    const doneMsg = logSpy.mock.calls[2][0];
 
     expect(welcomeMsg).toContain(`Welcome to ${bold('GraphQL Code Generator')}`);
     expect(doneMsg).toContain(`Config file generated at ${bold('codegen.yml')}`);

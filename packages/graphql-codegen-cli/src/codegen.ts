@@ -8,15 +8,29 @@ import {
 } from '@graphql-codegen/plugin-helpers';
 import { codegen } from '@graphql-codegen/core';
 
-import { Renderer } from './utils/listr-renderer';
+import { Renderer, ErrorRenderer } from './utils/listr-renderer';
 import { GraphQLError, GraphQLSchema, DocumentNode, parse } from 'graphql';
 import { getPluginByName } from './plugins';
 import { getPresetByName } from './presets';
 import { debugLog } from './utils/debugging';
-import { printSchemaWithDirectives } from '@graphql-toolkit/common';
+import { printSchemaWithDirectives } from '@graphql-tools/utils';
 import { CodegenContext, ensureContext } from './config';
+import fs from 'fs';
+import path from 'path';
+// eslint-disable-next-line
+import { createRequire, createRequireFromPath } from 'module';
 
-export const defaultLoader = (mod: string) => import(mod);
+const makeDefaultLoader = (from: string) => {
+  if (fs.statSync(from).isDirectory()) {
+    from = path.join(from, '__fake.js');
+  }
+
+  const relativeRequire = (createRequire || createRequireFromPath)(from);
+
+  return (mod: string) => {
+    return import(relativeRequire.resolve(mod));
+  };
+};
 
 export async function executeCodegen(input: CodegenContext | Types.Config): Promise<Types.FileOutput[]> {
   function wrapTask(task: () => void | Promise<void>, source: string) {
@@ -35,6 +49,7 @@ export async function executeCodegen(input: CodegenContext | Types.Config): Prom
 
   const context = ensureContext(input);
   const config = context.getConfig();
+  const pluginContext = context.getPluginContext();
   const result: Types.FileOutput[] = [];
   const commonListrOptions = {
     exitOnError: true,
@@ -57,7 +72,7 @@ export async function executeCodegen(input: CodegenContext | Types.Config): Prom
   } else {
     listr = new Listr({
       ...commonListrOptions,
-      renderer: config.silent ? 'silent' : Renderer,
+      renderer: config.silent ? 'silent' : config.errorsOnly ? ErrorRenderer : Renderer,
       nonTTYRenderer: config.silent ? 'silent' : 'default',
       collapse: true,
       clearOutput: false,
@@ -72,11 +87,12 @@ export async function executeCodegen(input: CodegenContext | Types.Config): Prom
   async function normalize() {
     /* Load Require extensions */
     const requireExtensions = normalizeInstanceOrArray<string>(config.require);
+    const loader = makeDefaultLoader(context.cwd);
     for (const mod of requireExtensions) {
-      await import(mod);
+      await loader(mod);
     }
 
-    /* Root templates-config */
+    /* Root plugin  config */
     rootConfig = config.config || {};
 
     /* Normalize root "schema" field */
@@ -86,7 +102,7 @@ export async function executeCodegen(input: CodegenContext | Types.Config): Prom
     rootDocuments = normalizeInstanceOrArray<Types.OperationDocument>(config.documents);
 
     /* Normalize "generators" field */
-    const generateKeys = Object.keys(config.generates);
+    const generateKeys = Object.keys(config.generates || {});
 
     if (generateKeys.length === 0) {
       throw new DetailedError(
@@ -217,14 +233,14 @@ export async function executeCodegen(input: CodegenContext | Types.Config): Prom
                       debugLog(`[CLI] Generating output`);
 
                       const normalizedPluginsArray = normalizeConfig(outputConfig.plugins);
-                      const pluginLoader = config.pluginLoader || defaultLoader;
+                      const pluginLoader = config.pluginLoader || makeDefaultLoader(context.cwd);
                       const pluginPackages = await Promise.all(
                         normalizedPluginsArray.map(plugin => getPluginByName(Object.keys(plugin)[0], pluginLoader))
                       );
                       const pluginMap: { [name: string]: CodegenPlugin } = {};
                       const preset: Types.OutputPreset = hasPreset
                         ? typeof outputConfig.preset === 'string'
-                          ? await getPresetByName(outputConfig.preset, defaultLoader)
+                          ? await getPresetByName(outputConfig.preset, makeDefaultLoader(context.cwd))
                           : outputConfig.preset
                         : null;
 
@@ -254,6 +270,7 @@ export async function executeCodegen(input: CodegenContext | Types.Config): Prom
                           documents: outputDocuments,
                           config: mergedConfig,
                           pluginMap,
+                          pluginContext,
                         });
                       } else {
                         outputs = [
@@ -265,6 +282,7 @@ export async function executeCodegen(input: CodegenContext | Types.Config): Prom
                             documents: outputDocuments,
                             config: mergedConfig,
                             pluginMap,
+                            pluginContext,
                           },
                         ];
                       }

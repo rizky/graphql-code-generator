@@ -1,14 +1,13 @@
 import {
-  ClientSideBaseVisitor,
   ClientSideBasePluginConfig,
-  LoadedFragment,
+  ClientSideBaseVisitor,
+  DocumentMode,
   getConfigValue,
   indentMultiline,
-  DocumentMode,
+  LoadedFragment,
 } from '@graphql-codegen/visitor-plugin-common';
 import autoBind from 'auto-bind';
 import { GraphQLSchema, Kind, OperationDefinitionNode } from 'graphql';
-
 import { RawGraphQLRequestPluginConfig } from './config';
 
 export interface GraphQLRequestPluginConfig extends ClientSideBasePluginConfig {
@@ -38,14 +37,17 @@ export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
 
     autoBind(this);
 
-    this._additionalImports.push(`import { GraphQLClient } from 'graphql-request';`);
+    const typeImport = this.config.useTypeImports ? 'import type' : 'import';
+
+    this._additionalImports.push(`${typeImport} { GraphQLClient } from 'graphql-request';`);
 
     if (this.config.documentMode !== DocumentMode.string) {
       this._additionalImports.push(`import { print } from 'graphql';`);
     }
 
     if (this.config.rawRequest) {
-      this._additionalImports.push(`import { GraphQLError } from 'graphql-request/dist/src/types';`);
+      this._additionalImports.push(`${typeImport} { GraphQLError } from 'graphql-request/dist/types';`);
+      this._additionalImports.push(`${typeImport} { Headers } from 'graphql-request/dist/types.dom';`);
     }
   }
 
@@ -67,6 +69,12 @@ export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
     return null;
   }
 
+  private getDocumentNodeVariable(documentVariableName: string): string {
+    return this.config.documentMode === DocumentMode.external
+      ? `Operations.${documentVariableName}`
+      : documentVariableName;
+  }
+
   public get sdkContent(): string {
     const allPossibleActions = this._operationsToInclude
       .map(o => {
@@ -74,10 +82,8 @@ export class GraphQLRequestVisitor extends ClientSideBaseVisitor<
           !o.node.variableDefinitions ||
           o.node.variableDefinitions.length === 0 ||
           o.node.variableDefinitions.every(v => v.type.kind !== Kind.NON_NULL_TYPE || v.defaultValue);
-        const doc =
-          this.config.documentMode === DocumentMode.string
-            ? o.documentVariableName
-            : `print(${o.documentVariableName})`;
+        const docVarName = this.getDocumentNodeVariable(o.documentVariableName);
+        const doc = this.config.documentMode === DocumentMode.string ? docVarName : `print(${docVarName})`;
         if (this.config.rawRequest) {
           return `${o.node.name.value}(variables${optionalVariables ? '?' : ''}: ${
             o.operationVariablesTypes

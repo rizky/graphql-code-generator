@@ -228,6 +228,42 @@ describe('TypeScript', () => {
       export type MyEnum = typeof MyEnum[keyof typeof MyEnum];`);
     });
 
+    it('Should work with enum as const combined with enum values', async () => {
+      const schema = buildSchema(/* GraphQL */ `
+        enum MyEnum {
+          A_B_C
+          X_Y_Z
+          _TEST
+          My_Value
+        }
+      `);
+      const result = (await plugin(
+        schema,
+        [],
+        {
+          enumsAsConst: true,
+          enumValues: {
+            MyEnum: {
+              A_B_C: 0,
+              X_Y_Z: 'Foo',
+              _TEST: 'Bar',
+              My_Value: 1,
+            },
+          },
+        },
+        { outputFile: '' }
+      )) as Types.ComplexPluginOutput;
+
+      expect(result.content).toBeSimilarStringTo(`
+      export const MyEnum = {
+        ABC: 0,
+        XYZ: 'Foo',
+        Test: 'Bar',
+        MyValue: 1
+      } as const;
+      export type MyEnum = typeof MyEnum[keyof typeof MyEnum];`);
+    });
+
     it('Should work with enum and enum values (enumsAsTypes)', async () => {
       const schema = buildSchema(/* GraphQL */ `
         "custom enum"
@@ -249,13 +285,70 @@ describe('TypeScript', () => {
       /** custom enum */
       export type MyEnum =
         /** this is a */
-        'A' |
+        | 'A' 
         /** this is b */
-        'B';`);
+        | 'B';`);
     });
   });
 
   describe('Issues', () => {
+    it('#4564 - numeric enum values set on schema level', async () => {
+      const testSchema = new GraphQLSchema({
+        types: [
+          new GraphQLObjectType({
+            name: 'Query',
+            fields: {
+              test: {
+                type: new GraphQLEnumType({
+                  name: 'MyEnum',
+                  values: {
+                    missing: {
+                      value: 0,
+                    },
+                  },
+                }),
+              },
+            },
+          }),
+        ],
+      });
+
+      const result = (await plugin(testSchema, [], {}, { outputFile: '' })) as Types.ComplexPluginOutput;
+      const output = mergeOutputs([result]);
+      expect(output).not.toContain(`Missing = 'missing'`);
+      expect(output).toContain(`Missing = 0`);
+    });
+
+    it('#4564 - numeric enum values set on schema level - complex numeric', async () => {
+      const testSchema = new GraphQLSchema({
+        types: [
+          new GraphQLObjectType({
+            name: 'Query',
+            fields: {
+              test: {
+                type: new GraphQLEnumType({
+                  name: 'MyEnum',
+                  values: {
+                    available: {
+                      value: '01',
+                    },
+                    somethingElse: {
+                      value: '99',
+                    },
+                  },
+                }),
+              },
+            },
+          }),
+        ],
+      });
+
+      const result = (await plugin(testSchema, [], {}, { outputFile: '' })) as Types.ComplexPluginOutput;
+      const output = mergeOutputs([result]);
+      expect(output).toContain(`Available = '01'`);
+      expect(output).toContain(`SomethingElse = '99'`);
+    });
+
     it('#3137 - numeric enum value', async () => {
       const testSchema = buildSchema(/* GraphQL */ `
         type Query {
@@ -287,8 +380,39 @@ describe('TypeScript', () => {
       expect(output).toBeSimilarStringTo(`export enum Test {
         A = 0,
         B = 'test',
-        C = 2
+        C = '2'
       }`);
+    });
+
+    it('#4157 - Should generate numeric values for enums if numericEnums is set to true', async () => {
+      const testSchema = buildSchema(/* GraphQl */ `
+        enum Status {
+            Idle
+            Running
+            Error
+        }
+      `);
+
+      const result = (await plugin(
+        testSchema,
+        [],
+        {
+          numericEnums: true,
+        },
+        {
+          outputFile: '',
+        }
+      )) as Types.ComplexPluginOutput;
+      const output = mergeOutputs([result]);
+      validateTs(output);
+
+      expect(output).toBeSimilarStringTo(`
+        export enum Status {
+            Idle = 0,
+            Running = 1,
+            Error = 2
+        }
+      `);
     });
 
     it('#2679 - incorrect prefix for enums', async () => {
@@ -365,6 +489,24 @@ describe('TypeScript', () => {
       )) as Types.ComplexPluginOutput;
 
       expect(result.prepend[0]).toBe(`import MyEnum from './files';`);
+    });
+
+    it('#4834 - enum members should be quoted if numeric', async () => {
+      const testSchema = buildSchema(/* GraphQL */ `
+        enum MediaItemSizeEnum {
+          AXB
+          _1X2
+          _3X4
+        }
+      `);
+
+      const result = (await plugin(testSchema, [], {})) as Types.ComplexPluginOutput;
+
+      expect(result.content).toBeSimilarStringTo(`export enum MediaItemSizeEnum {
+        Axb = 'AXB',
+        '1X2' = '_1X2',
+        '3X4' = '_3X4'
+      }`);
     });
 
     it('#2976 - Issues with mapped enumValues and type prefix in args', async () => {
@@ -680,8 +822,10 @@ describe('TypeScript', () => {
       )) as Types.ComplexPluginOutput;
 
       expect(result.content).toBeSimilarStringTo(`
-      export type MyEnum = 'A' | 'B';
-    `);
+        export type MyEnum = 
+          | 'A' 
+          | 'B';
+      `);
       validateTs(result);
     });
 
@@ -699,7 +843,53 @@ describe('TypeScript', () => {
       )) as Types.ComplexPluginOutput;
 
       expect(result.content).toBeSimilarStringTo(`
-      export type MyEnum = 'BOOP' | 'B';
+        export type MyEnum = 
+          | 'BOOP' 
+          | 'B';
+      `);
+      validateTs(result);
+    });
+
+    it('Should add `%future added value` to enum when futureProofEnums is set and also enumAsTypes', async () => {
+      const schema = buildSchema(`
+      enum MyEnum {
+        A
+        B
+      }`);
+      const result = (await plugin(
+        schema,
+        [],
+        { enumsAsTypes: true, futureProofEnums: true },
+        { outputFile: '' }
+      )) as Types.ComplexPluginOutput;
+
+      expect(result.content).toBeSimilarStringTo(`
+      export type MyEnum = 
+        | 'A' 
+        | 'B' 
+        | '%future added value'
+    `);
+      validateTs(result);
+    });
+
+    it('Should not add `%future added value` to enum when futureProofEnums is set, but not enumAsTypes', async () => {
+      const schema = buildSchema(`
+      enum MyEnum {
+        A
+        B
+      }`);
+      const result = (await plugin(
+        schema,
+        [],
+        { futureProofEnums: true },
+        { outputFile: '' }
+      )) as Types.ComplexPluginOutput;
+
+      expect(result.content).toBeSimilarStringTo(`
+      export enum MyEnum {
+        A = 'A',
+        B = 'B'
+      }
     `);
       validateTs(result);
     });
@@ -1567,6 +1757,40 @@ describe('TypeScript', () => {
       validateTs(result);
     });
 
+    it('Should build list type correctly when wrapping field definitions', async () => {
+      const schema = buildSchema(`
+        type ListOfStrings {
+          foo: [String!]!
+        }
+
+        type ListOfMaybeStrings {
+          foo: [String]!
+        }
+      `);
+      const result = (await plugin(
+        schema,
+        [],
+        { wrapFieldDefinitions: true },
+        { outputFile: '' }
+      )) as Types.ComplexPluginOutput;
+
+      expect(result.content).toBeSimilarStringTo(`
+        export type ListOfStrings = {
+          __typename?: 'ListOfStrings';
+          foo: Array<FieldWrapper<Scalars['String']>>;
+        };
+      `);
+
+      expect(result.content).toBeSimilarStringTo(`
+        export type ListOfMaybeStrings = {
+          __typename?: 'ListOfMaybeStrings';
+          foo: Array<Maybe<FieldWrapper<Scalars['String']>>>;
+        };
+      `);
+
+      validateTs(result);
+    });
+
     it('Should not wrap input type fields', async () => {
       const schema = buildSchema(`
         input MyInput {
@@ -2088,6 +2312,24 @@ describe('TypeScript', () => {
         };
       `);
       await validateTs(result);
+    });
+
+    it('Should generate correctly types for inputs with default value - #4273', async () => {
+      const schema = buildSchema(
+        `input MyInput { a: String = "default", b: String! = "default", c: String, d: String! }`
+      );
+      const result = await plugin(schema, [], {}, { outputFile: '' });
+
+      expect(result.content).toBeSimilarStringTo(`
+        export type MyInput = {
+          a?: Maybe<Scalars['String']>;
+          b?: Scalars['String'];
+          c?: Maybe<Scalars['String']>;
+          d: Scalars['String'];
+        };
+    `);
+
+      validateTs(result);
     });
   });
 

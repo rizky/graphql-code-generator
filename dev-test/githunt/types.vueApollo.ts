@@ -2,6 +2,7 @@ import gql from 'graphql-tag';
 import * as VueApolloComposable from '@vue/apollo-composable';
 import * as VueCompositionApi from '@vue/composition-api';
 export type Maybe<T> = T | null;
+export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
 export type ReactiveFunction<TParam> = () => TParam;
 /** All built-in and custom scalars, mapped to their actual values */
 export type Scalars = {
@@ -166,9 +167,9 @@ export type SubscriptionCommentAddedArgs = {
   repoFullName: Scalars['String'];
 };
 
-export type OnCommentAddedSubscriptionVariables = {
+export type OnCommentAddedSubscriptionVariables = Exact<{
   repoFullName: Scalars['String'];
-};
+}>;
 
 export type OnCommentAddedSubscription = { __typename?: 'Subscription' } & {
   commentAdded?: Maybe<
@@ -178,11 +179,11 @@ export type OnCommentAddedSubscription = { __typename?: 'Subscription' } & {
   >;
 };
 
-export type CommentQueryVariables = {
+export type CommentQueryVariables = Exact<{
   repoFullName: Scalars['String'];
   limit?: Maybe<Scalars['Int']>;
   offset?: Maybe<Scalars['Int']>;
-};
+}>;
 
 export type CommentQuery = { __typename?: 'Query' } & {
   currentUser?: Maybe<{ __typename?: 'User' } & Pick<User, 'login' | 'html_url'>>;
@@ -202,7 +203,7 @@ export type CommentsPageCommentFragment = { __typename?: 'Comment' } & Pick<Comm
     postedBy: { __typename?: 'User' } & Pick<User, 'login' | 'html_url'>;
   };
 
-export type CurrentUserForProfileQueryVariables = {};
+export type CurrentUserForProfileQueryVariables = Exact<{ [key: string]: never }>;
 
 export type CurrentUserForProfileQuery = { __typename?: 'Query' } & {
   currentUser?: Maybe<{ __typename?: 'User' } & Pick<User, 'login' | 'avatar_url'>>;
@@ -215,20 +216,20 @@ export type FeedEntryFragment = { __typename?: 'Entry' } & Pick<Entry, 'id' | 'c
   } & VoteButtonsFragment &
   RepoInfoFragment;
 
-export type FeedQueryVariables = {
+export type FeedQueryVariables = Exact<{
   type: FeedType;
   offset?: Maybe<Scalars['Int']>;
   limit?: Maybe<Scalars['Int']>;
-};
+}>;
 
 export type FeedQuery = { __typename?: 'Query' } & {
   currentUser?: Maybe<{ __typename?: 'User' } & Pick<User, 'login'>>;
   feed?: Maybe<Array<Maybe<{ __typename?: 'Entry' } & FeedEntryFragment>>>;
 };
 
-export type SubmitRepositoryMutationVariables = {
+export type SubmitRepositoryMutationVariables = Exact<{
   repoFullName: Scalars['String'];
-};
+}>;
 
 export type SubmitRepositoryMutation = { __typename?: 'Mutation' } & {
   submitRepository?: Maybe<{ __typename?: 'Entry' } & Pick<Entry, 'createdAt'>>;
@@ -242,10 +243,10 @@ export type RepoInfoFragment = { __typename?: 'Entry' } & Pick<Entry, 'createdAt
     postedBy: { __typename?: 'User' } & Pick<User, 'html_url' | 'login'>;
   };
 
-export type SubmitCommentMutationVariables = {
+export type SubmitCommentMutationVariables = Exact<{
   repoFullName: Scalars['String'];
   commentContent: Scalars['String'];
-};
+}>;
 
 export type SubmitCommentMutation = { __typename?: 'Mutation' } & {
   submitComment?: Maybe<{ __typename?: 'Comment' } & CommentsPageCommentFragment>;
@@ -255,10 +256,10 @@ export type VoteButtonsFragment = { __typename?: 'Entry' } & Pick<Entry, 'score'
     vote: { __typename?: 'Vote' } & Pick<Vote, 'vote_value'>;
   };
 
-export type VoteMutationVariables = {
+export type VoteMutationVariables = Exact<{
   repoFullName: Scalars['String'];
   type: VoteType;
-};
+}>;
 
 export type VoteMutation = { __typename?: 'Mutation' } & {
   vote?: Maybe<
@@ -339,7 +340,7 @@ export const OnCommentAddedDocument = gql`
  * When your component renders, `useOnCommentAddedSubscription` returns an object from Apollo Client that contains result, loading and error properties
  * you can use to render your UI.
  *
- * @param options that will be passed into the subscription, supported options are listed on: https://v4.apollo.vuejs.org/guide-composable/query.html#options;
+ * @param options that will be passed into the subscription, supported options are listed on: https://v4.apollo.vuejs.org/guide-composable/subscription.html#options;
  *
  * @example
  * const { result, loading, error } = useOnCommentAddedSubscription(
@@ -547,10 +548,11 @@ export const SubmitRepositoryDocument = gql`
  * });
  */
 export function useSubmitRepositoryMutation(
-  options: VueApolloComposable.UseMutationOptionsWithVariables<
-    SubmitRepositoryMutation,
-    SubmitRepositoryMutationVariables
-  >
+  options:
+    | VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>
+    | ReactiveFunction<
+        VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>
+      >
 ) {
   return VueApolloComposable.useMutation<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>(
     SubmitRepositoryDocument,
@@ -589,7 +591,9 @@ export const SubmitCommentDocument = gql`
  * });
  */
 export function useSubmitCommentMutation(
-  options: VueApolloComposable.UseMutationOptionsWithVariables<SubmitCommentMutation, SubmitCommentMutationVariables>
+  options:
+    | VueApolloComposable.UseMutationOptions<SubmitCommentMutation, SubmitCommentMutationVariables>
+    | ReactiveFunction<VueApolloComposable.UseMutationOptions<SubmitCommentMutation, SubmitCommentMutationVariables>>
 ) {
   return VueApolloComposable.useMutation<SubmitCommentMutation, SubmitCommentMutationVariables>(
     SubmitCommentDocument,
@@ -631,7 +635,9 @@ export const VoteDocument = gql`
  * });
  */
 export function useVoteMutation(
-  options: VueApolloComposable.UseMutationOptionsWithVariables<VoteMutation, VoteMutationVariables>
+  options:
+    | VueApolloComposable.UseMutationOptions<VoteMutation, VoteMutationVariables>
+    | ReactiveFunction<VueApolloComposable.UseMutationOptions<VoteMutation, VoteMutationVariables>>
 ) {
   return VueApolloComposable.useMutation<VoteMutation, VoteMutationVariables>(VoteDocument, options);
 }

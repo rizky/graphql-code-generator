@@ -85,6 +85,25 @@ describe('Vue Apollo', () => {
       await validateTypeScript(content, schema, docs, {});
     });
 
+    it('should import VueApollo and VueCompositionApi dependencies from configured packages', async () => {
+      const docs = [{ location: '', document: basicDoc }];
+      const content = (await plugin(
+        schema,
+        docs,
+        {
+          vueApolloComposableImportFrom: 'custom-apollo-composable-package',
+          vueCompositionApiImportFrom: 'custom-composition-api-package',
+        },
+        {
+          outputFile: 'graphql.ts',
+        }
+      )) as Types.ComplexPluginOutput;
+
+      expect(content.prepend).toContain(`import * as VueApolloComposable from 'custom-apollo-composable-package';`);
+      expect(content.prepend).toContain(`import * as VueCompositionApi from 'custom-composition-api-package';`);
+      await validateTypeScript(content, schema, docs, {});
+    });
+
     it('should import DocumentNode when using noGraphQLTag', async () => {
       const docs = [{ location: '', document: basicDoc }];
       const content = (await plugin(
@@ -411,7 +430,7 @@ query MyFeed {
       );
 
       expect(content.content).toBeSimilarStringTo(
-        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> = {}) {
+        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> | ReactiveFunction<VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>> = {}) {
            return VueApolloComposable.useMutation<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>(SubmitRepositoryDocument, options);
          }`
       );
@@ -458,7 +477,7 @@ query MyFeed {
       );
 
       expect(content.content).toBeSimilarStringTo(
-        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> = {}) {
+        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> | ReactiveFunction<VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>> = {}) {
            return VueApolloComposable.useMutation<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>(SubmitRepositoryMutationDocument, options);
         }`
       );
@@ -594,7 +613,7 @@ query MyFeed {
       )) as Types.ComplexPluginOutput;
 
       expect(content.content).toBeSimilarStringTo(
-        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptionsWithVariables<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>) {
+        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> | ReactiveFunction<VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>>) {
            return VueApolloComposable.useMutation<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>(SubmitRepositoryDocument, options);
         }`
       );
@@ -622,7 +641,7 @@ query MyFeed {
       )) as Types.ComplexPluginOutput;
 
       expect(content.content).toBeSimilarStringTo(
-        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptionsNoVariables<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> = {}) {
+        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> | ReactiveFunction<VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>> = {}) {
            return VueApolloComposable.useMutation<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>(SubmitRepositoryDocument, options);
         }`
       );
@@ -650,7 +669,7 @@ query MyFeed {
       )) as Types.ComplexPluginOutput;
 
       expect(content.content).toBeSimilarStringTo(
-        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> = {}) {
+        `export function useSubmitRepositoryMutation(options: VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables> | ReactiveFunction<VueApolloComposable.UseMutationOptions<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>> = {}) {
            return VueApolloComposable.useMutation<SubmitRepositoryMutation, SubmitRepositoryMutationVariables>(SubmitRepositoryDocument, options);
         }`
       );
@@ -717,6 +736,23 @@ query MyFeed {
  * );
  */`;
 
+    const subscriptionDocBlockSnapshot = `/**
+ * __useCommentAddedSubscription__
+ *
+ * To run a query within a Vue component, call \`useCommentAddedSubscription\` and pass it any options that fit your needs.
+ * When your component renders, \`useCommentAddedSubscription\` returns an object from Apollo Client that contains result, loading and error properties
+ * you can use to render your UI.
+ *
+ * @param options that will be passed into the subscription, supported options are listed on: https://v4.apollo.vuejs.org/guide-composable/subscription.html#options;
+ *
+ * @example
+ * const { result, loading, error } = useCommentAddedSubscription(
+ *   {
+ *      name: // value for 'name'
+ *   }
+ * );
+ */`;
+
     const mutationDocBlockSnapshot = `/**
  * __useSubmitRepositoryMutation__
  *
@@ -747,6 +783,11 @@ query MyFeed {
             id
           }
         }
+        subscription commentAdded($name: String) {
+          commentAdded(repoFullName: $name) {
+            id
+          }
+        }
       `);
 
       const docs = [{ location: '', document: documents }];
@@ -761,12 +802,15 @@ query MyFeed {
       )) as Types.ComplexPluginOutput;
 
       const queryDocBlock = extract(content.content.substr(content.content.indexOf('/**')));
-
       expect(queryDocBlock).toEqual(queryDocBlockSnapshot);
 
-      const mutationDocBlock = extract(content.content.substr(content.content.lastIndexOf('/**')));
-
+      const mutationDocBlock = extract(
+        content.content.substr(content.content.indexOf('/**', content.content.indexOf('/**') + 1))
+      );
       expect(mutationDocBlock).toEqual(mutationDocBlockSnapshot);
+
+      const subscriptionDocBlock = extract(content.content.substr(content.content.lastIndexOf('/**')));
+      expect(subscriptionDocBlock).toEqual(subscriptionDocBlockSnapshot);
     });
 
     it('Should NOT generate JSDoc docblocks for composition functions if addDocBlocks is false', async () => {
